@@ -60,7 +60,7 @@ function [PHI,R,invR] = genR(xm,lxm,Q,eta,wavelength,rho,Sigma_n2)
         for kk = 1:lxm
             for ll = 1:kk-1
                 psi0(kk,ll) = exp(1i*2*pi/wavelength*(xm(kk)-xm(ll))*sin(eta(1,qqq)))...
-                    .* exp(-0.5 * (2*pi/wavelength*(xm(kk)-xm(ll))*eta(2,qqq)*cos(eta(1,qqq))).^2);
+                    .* exp(-0.5 * (2*pi/wavelength*(xm(kk)-xm(ll))*eta(2,qqq)*cos(eta(1,qqq))).^2); % Gaussian Dist.
                 psi0(ll,kk) = conj(psi0(kk,ll));
             end
         end
