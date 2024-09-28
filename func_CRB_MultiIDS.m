@@ -26,15 +26,16 @@ for qq = 1:Q
     eta_sel = eta(:,qq); % 选择第qq个信源计算Deta
     eta1 = eta_sel(1);  eta2 = eta_sel(2);
     PHIq = PHI(:,:,qq); 
-    % 首先为了简便，给出C矩阵
-    [C1,C2,C3] = genC(eta2,xm,lxm,wavelength); 
     % 这里给出PHI对eta的各偏导项, Dt, Ds
-    [Dt,Ds] = genDPHI(eta1,rho,PHIq,C1,C2,C3);
+    [Dt0,Ds0] = genDPHI(xm,eta1,eta2,wavelength);
+    Dt = rho*Dt0;
+    Ds = rho*Ds0;
 
     Ut(:,qq) = vec(R05*Dt*R05);
     Ua(:,qq) = vec(R05*Ds*R05);
     Vs(:,qq) = vec(R05*PHIq*R05);
 end
+
 Vn = vec(invR);
 U = [Ut,Ua];
 V = [Vs,Vn];
@@ -45,17 +46,13 @@ CRB = sqrt((CRB(1 : 2 * Q))) * 180 / pi;
 
 %%%--------------------------MAIN FUNCTION END--------------------------%%%
 %%%--------------------------NEXT: NESTED FUNCTION--------------------------%%%
-function [rsl_vec] = vec(A)
-    % vectorization
-    rsl_vec = reshape(A,[],1);
-end
-
 function [PHI,R,invR] = genR(xm,lxm,Q,eta,wavelength,rho,Sigma_n2)
     % phi0, PHI是归一化的信号协方差矩阵
     % PHI存储Q个MXM维的信息
     PHI = zeros(lxm,lxm,Q);
     Rs = 0;
     for qqq = 1:Q
+        % % 高斯分布
         psi0 = eye(lxm);
         for kk = 1:lxm
             for ll = 1:kk-1
@@ -64,6 +61,16 @@ function [PHI,R,invR] = genR(xm,lxm,Q,eta,wavelength,rho,Sigma_n2)
                 psi0(ll,kk) = conj(psi0(kk,ll));
             end
         end
+
+        % % 均匀分布
+        % psi0 =  zeros(M,M); % obtian the analytical source covariance matrix for Gaussian Dist.
+        % for kk = 1:M
+        %     for ll = 1:M
+        %         psi0(kk,ll) = exp(1i*2*pi/wavelength*(xm(kk)-xm(ll))*sin(eta(1,qqq)))*...
+        %             sinc(2*sqrt(3)/wavelength*(xm(kk)-xm(ll))*eta(2,qqq)*cos(eta(1,qqq)));
+        %     end
+        % end  
+
         Rs = Rs + rho * psi0;
         PHI(:,:,qqq) = psi0;
     end
@@ -72,28 +79,34 @@ function [PHI,R,invR] = genR(xm,lxm,Q,eta,wavelength,rho,Sigma_n2)
     invR = inv(R);
 end
 
-function [C1,C2,C3] = genC(asb,xm,lxm,wavelength)
-    C1 = zeros(lxm);    
-    C2 = zeros(lxm);
-    C3 = zeros(lxm);
-    for kkk = 1:lxm
+function [Dt,Ds] = genDPHI(xm,sita,sigm,wavelength)
+    M = length(xm);
+    [C1,C2] = genC(xm,M,wavelength);
+    PHI0 = exp(sin(sita)*C1) .* exp((sigm^2*cos(sita)^2/2)*C2);
+    P1 = cos(sita)*C1 - 0.5*sigm^2*sin(2*sita)*C2;
+    P2 = sigm*cos(sita)^2*C2;
+    % 计算对PHI对于每组eta的一阶导数
+    Dt = P1 .* PHI0;
+    Ds = P2 .* PHI0;
+end
+
+function [C1,C2] = genC(xm,M,wavelength)
+    C1 = zeros(M);    
+    C2 = zeros(M);
+    for kkk = 1:M
         for lll = 1:kkk-1
-            C1(kkk,lll) = 2*pi/wavelength*(xm(kkk)-xm(lll));
-            C2(kkk,lll) = (2*pi/wavelength*(xm(kkk)-xm(lll))*(asb))^2;
-            C3(kkk,lll) = (2*pi/wavelength*(xm(kkk)-xm(lll)))^2*(asb);
+            C1(kkk,lll) = 1i*2*pi/wavelength*(xm(kkk)-xm(lll));
+            C2(kkk,lll) = -(2*pi/wavelength*(xm(kkk)-xm(lll)))^2;
             C1(lll,kkk) = -C1(kkk,lll);
-            C2(lll,kkk) = C2(kkk,lll);
-            C3(lll,kkk) = C3(kkk,lll);       
+            C2(lll,kkk) = C2(kkk,lll);     
         end
     end
 end
 
-function [Dt,Ds] = genDPHI(sita,rho,PHI,C1,C2,C3)
-    % 计算对PHI对于每组eta的导数
-    Dt = rho * (1i*cos(sita).*C1+0.5*sin(2*sita).*C2) .* PHI;
-    Ds = rho * (-(cos(sita))^2.*C3) .* PHI;
+function [rsl_vec] = vec(A)
+    % vectorization
+    rsl_vec = reshape(A,[],1);
 end
-
 
 end
 
